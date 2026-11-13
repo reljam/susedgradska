@@ -1,0 +1,307 @@
+<!DOCTYPE html>
+<!-- saved from url=(0041)https://susedgradska.relja.net/prije.html -->
+<html lang="hr"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>3D tlocrt – bez namještaja</title>
+<style>
+:root{--bg:#e9e7e2;--fg:#26292d;--btn:#fbfaf8;--line:#b9b5ac;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#1c2024;--fg:#e4e6e8;--btn:#2a2f35;--line:#4a5058}}
+:root[data-theme="dark"]{--bg:#1c2024;--fg:#e4e6e8;--btn:#2a2f35;--line:#4a5058}
+html,body{height:100%;margin:0}
+body{background:var(--bg);color:var(--fg);font-family:system-ui,-apple-system,"Segoe UI",sans-serif;overflow:hidden}
+#c{display:block;width:100%;height:100%;touch-action:none;cursor:grab}
+.ui{position:absolute;left:12px;top:calc(env(safe-area-inset-top,0px) + 12px);display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+.ui button{background:var(--btn);color:var(--fg);border:1px solid var(--line);border-radius:6px;padding:7px 12px;font:inherit;font-size:14px;cursor:pointer}
+.legend{position:absolute;right:12px;bottom:calc(env(safe-area-inset-bottom,0px) + 12px);background:var(--btn);color:var(--fg);border:1px solid var(--line);border-radius:6px;padding:8px 12px;font-size:14px;display:flex;flex-direction:column;gap:6px}
+.legend div{display:flex;align-items:center;gap:8px}
+.legend i{display:inline-block;width:16px;height:16px;border-radius:3px;border:1px solid rgba(0,0,0,.25)}
+.hint{position:absolute;left:12px;bottom:calc(env(safe-area-inset-bottom,0px) + 12px);font-size:13px;opacity:.7}
+</style>
+</head>
+<body>
+<canvas id="c" width="2560" height="1305" style="cursor: grab;"></canvas>
+<div class="ui">
+  <button id="iso">Izometrija</button>
+  <button id="top">Odozgo</button>
+  <button id="dim">Mjere</button>
+  <button id="zi">+</button>
+  <button id="zo">−</button>
+</div>
+<div class="legend">
+  <div><i style="background:#d32f2f"></i>zid za rušenje</div>
+  <div><i style="background:#2e9e4f"></i>novi zid</div>
+</div>
+<div class="hint">Povuci za okretanje, kotačić ili +/− za zumiranje. Visina zidova 2,6 m (pretpostavka).</div>
+<script src="./3D tlocrt_files/three.min.js.download"></script>
+<script>window.THREE||document.write('<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"><\/script>')</script>
+<script>
+const S=120,OX=460,OY=46,H=2.6,T=0.12;
+const P=(x,y)=>[(x-OX)/S,(y-OY)/S];
+// zidovi iz tlocrta (px, 120 px = 1 m): x1,y1,x2,y2[,debljina]
+const W=[
+[460,60,907,60],[907,60,907,113],[907,113,1024,113],[1180,113,1213,113],[1213,113,1213,46],[1213,46,1220,46],[1407,46,1414,46],
+[1414,46,1414,818], // istočni zid: jedan zid iza kuhinje, ostave i kupaone
+[1190,395,1230,395],
+
+[460,60,460,88],[460,400,460,650],[460,952,460,963],[460,639,937,639],[460,963,937,963],[937,963,1069,963],
+[937,621,937,818],[937,930,937,963],
+[1190,494,1190,670],[1190,769,1190,963]
+];
+// zidovi koji završavaju na unutarnjem licu istočnog zida (x = 1414 − 7,2 = 1406,8), ne ulaze u njega; koordinate već uključuju produžetak na slobodnom kraju
+const WE=[[1182.8,494,1406.8,494],[1182.8,818,1406.8,818]];
+// crveni zidovi
+const WR=[[937,494,1080,494],[937,494,937,518]];
+const WRE=[1316.8,395,1406.8,395]; // crveni zid ostave, staje na licu istočnog zida
+// otvori za vrata (nadvoj)
+const O=[[1080,494,1190,494],[937,518,937,621],[937,818,937,930],[1069,963,1190,963],[1190,670,1190,769],[1230,395,1324,395],[1080,639,1190,639]];
+// podovi
+const R=[
+{c:0xc9a77c,p:[[460,60],[907,60],[907,113],[1213,113],[1213,255],[1205,255],[1205,494],[937,494],[937,639],[460,639]]},
+{c:0xc9a77c,p:[[1213,46],[1414,46],[1414,395],[1205,395],[1205,255],[1213,255]]},
+{c:0xb7b2a6,p:[[1205,395],[1414,395],[1414,494],[1205,494]]},
+{c:0xb48f66,p:[[460,639],[937,639],[937,963],[460,963]]},
+{c:0xd8d3c8,p:[[937,494],[1190,494],[1190,963],[937,963]]},
+{c:0xa9b4b8,p:[[1190,494],[1414,494],[1414,818],[1190,818]]}
+];
+
+const rnd=(a,b)=>a+Math.random()*(b-a);
+function tex(w,h,fn,rep){const c=document.createElement('canvas');c.width=w;c.height=h;fn(c.getContext('2d'),w,h);const t=new THREE.CanvasTexture(c);t.wrapS=t.wrapT=THREE.RepeatWrapping;t.repeat.set(rep,rep);t.anisotropy=4;return t;}
+function planks(g,w,h,rows,hu,sa,lu,gap){g.fillStyle=gap;g.fillRect(0,0,w,h);const rh=h/rows;for(let r=0;r<rows;r++){const off=(r*83)%w,c=[lu+rnd(-5,5),lu+rnd(-5,5)];for(let k=-1;k<3;k++){g.fillStyle='hsl('+hu+','+sa+'%,'+c[k&1]+'%)';g.fillRect(off+(w/2)*k+1,r*rh+1,w/2-2,rh-2);}}}
+function tiles(g,w,h,n,hs,grout){g.fillStyle=grout;g.fillRect(0,0,w,h);const s=w/n;for(let i=0;i<n;i++)for(let j=0;j<n;j++){g.fillStyle='hsl('+hs[0]+','+hs[1]+'%,'+(hs[2]+rnd(-3,3))+'%)';g.fillRect(i*s+2,j*s+2,s-4,s-4);}}
+function carpet(g,w,h){g.fillStyle='#8a8e92';g.fillRect(0,0,w,h);for(let i=0;i<1800;i++){g.fillStyle=Math.random()<.5?'rgba(255,255,255,.12)':'rgba(0,0,0,.12)';g.fillRect(rnd(0,w),rnd(0,h),2,2);}}
+const fmat=t=>new THREE.MeshStandardMaterial({map:t,roughness:.9,side:THREE.DoubleSide});
+function herring(g,w,h){const u=w/8;g.fillStyle='#8f6a47';g.fillRect(0,0,w,h);g.fillStyle='#b48a60';const r=(x,y,a,b)=>g.fillRect(x*u+1,y*u+1,a*u-2,b*u-2);for(let b=-3;b<=3;b++)for(let k=-14;k<=14;k++){r(k-4*b,k+4*b,4,1);r(k+4-4*b,k-3+4*b,1,4);}}
+const tPar=fmat(tex(256,256,herring,1));
+const tBrown=fmat(tex(240,240,(g,w,h)=>tiles(g,w,h,6,[22,45,32],'#6d5a48'),1/1.2));
+const tCarpet=fmat(tex(128,128,carpet,2));
+const tBlue=fmat(tex(256,256,(g,w,h)=>tiles(g,w,h,2,[222,62,26],'#b9c0cc'),1/1.2));
+const FM=[tPar,tBrown,tBrown,tPar,tCarpet,tBlue];
+function deck(rx,ry,rot){const t=tex(256,256,(g,w,h)=>{g.fillStyle='#9a744c';g.fillRect(0,0,w,h);g.fillStyle='#caa070';const rh=h/16;for(let r=0;r<16;r++){const off=(r*83)%w;for(let k=-1;k<3;k++)g.fillRect(off+(w/2)*k+1,r*rh+1,w/2-2,rh-2);}},1);t.repeat.set(rx,ry);if(rot){t.center.set(.5,.5);t.rotation=Math.PI/2;}return new THREE.MeshStandardMaterial({map:t,roughness:.6});}
+const cv=document.getElementById('c');
+const ren=new THREE.WebGLRenderer({canvas:cv,antialias:true,alpha:true});
+ren.setPixelRatio(Math.min(devicePixelRatio,2));
+const scene=new THREE.Scene();
+const cam=new THREE.PerspectiveCamera(35,1,0.1,100);
+scene.add(new THREE.AmbientLight(0xffffff,0.65));
+const dl=new THREE.DirectionalLight(0xffffff,0.7);dl.position.set(-6,12,4);scene.add(dl);
+
+const wallMat=new THREE.MeshStandardMaterial({color:0xf4f1ea,roughness:.9});
+const lintMat=new THREE.MeshStandardMaterial({color:0xe2ddd2,roughness:.9});
+const edgeMat=new THREE.LineBasicMaterial({color:0x6b665c});
+
+function box(a,ext,h,y0,mat,t){
+  const [x1,y1,x2,y2]=a,A=P(x1,y1),B=P(x2,y2);
+  const horiz=y1===y2,th=t||T,e=ext?th:0;
+  const w=horiz?Math.abs(B[0]-A[0])+e:th, d=horiz?th:Math.abs(B[1]-A[1])+e;
+  const g=new THREE.BoxGeometry(w,h,d);
+  const m=new THREE.Mesh(g,mat);
+  m.position.set((A[0]+B[0])/2,y0+h/2,(A[1]+B[1])/2);
+  m.add(new THREE.LineSegments(new THREE.EdgesGeometry(g),edgeMat));
+  scene.add(m);
+}
+const wallRed=new THREE.MeshStandardMaterial({color:0xd32f2f,roughness:.9});
+const dRed=new THREE.MeshStandardMaterial({color:0xd32f2f,roughness:.5});
+const wallGreen=new THREE.MeshStandardMaterial({color:0x2e9e4f,roughness:.9});
+const dGreen=new THREE.MeshStandardMaterial({color:0x2e9e4f,roughness:.5});
+W.forEach(w=>box(w,true,H,0,wallMat));
+WE.forEach(w=>box(w,false,H,0,wallMat));
+WR.forEach(w=>box(w,true,H,0,wallRed));
+box(WRE,false,H,0,wallRed);
+// zeleni zidovi: pregrada 2,2 m od zapadnog zida (od sjevernog zida do zida prema spavaćoj sobi, staje na njegovom licu); nastavak zida prema spavaćoj sobi (+ vrata kao O[6])
+// pregrada s otvorom za klizna vrata: 1 m od sjevernog zida i 2,2 m od zida prema spavaćoj sobi (mjereno od lica zidova, otvor ~1,5 m)
+box([724,52.8,724,187.2],false,H,0,wallGreen);
+box([724,367.8,724,631.8],false,H,0,wallGreen);
+box([724,187.2,724,367.8],false,0.55,2.05,wallGreen);
+box([937,639,1080,639],true,H,0,wallGreen);
+// klizna vrata (kao na slici): bijelo krilo, napola otvoreno, uvlači se u zid prema zidu 16; okvir s obje strane i okrugla ručka
+{const z0=(187.2-OY)/S,z1=(367.8-OY)/S,xm=(724-OX)/S,wc=0.08,tc=0.015,hh=2.05,lw=z1-z0;
+ const cr2=new THREE.MeshStandardMaterial({color:0xf2efe6,roughness:.5}),chm=new THREE.MeshStandardMaterial({color:0xc4c8cc,metalness:.6,roughness:.3});
+ const add=(sx,sy,sz,x,y,z,mat)=>{const g=new THREE.BoxGeometry(sx,sy,sz),m=new THREE.Mesh(g,mat);m.position.set(x,y,z);m.add(new THREE.LineSegments(new THREE.EdgesGeometry(g),edgeMat));scene.add(m);};
+ add(0.04,hh,lw,xm,hh/2,z1,cr2);
+ [-1,1].forEach(sd=>{const xc=xm+sd*(T/2+tc/2);
+  add(tc,hh,wc,xc,hh/2,z0-wc/2,cr2);add(tc,hh,wc,xc,hh/2,z1+wc/2,cr2);add(tc,wc,lw+2*wc,xc,hh+wc/2,(z0+z1)/2,cr2);
+  const hd=new THREE.Mesh(new THREE.CylinderGeometry(0.03,0.03,0.012,24),chm);hd.rotation.z=Math.PI/2;hd.position.set(xm+sd*0.023,1.0,z0+lw/2+0.12);scene.add(hd);});}
+O.forEach((o,i)=>box(o,false,0.55,2.05,[0,1,5].includes(i)?wallRed:(i===6?wallGreen:lintMat),T));
+R.forEach((r,i)=>{
+  const s=new THREE.Shape(r.p.map(q=>{const v=P(q[0],q[1]);return new THREE.Vector2(v[0],-v[1]);}));
+  const m=new THREE.Mesh(new THREE.ShapeGeometry(s),FM[i]);
+  m.rotation.x=-Math.PI/2;m.position.y=-0.01;scene.add(m);
+});
+
+[[1,'Dnevna soba',680,350],[2,'Kuhinja',1310,250],[3,'Ostava',1315,445],[4,'Spavaća soba',698,800],[5,'Predsoblje',1063,730],[6,'Kupaona',1302,621]].forEach(([n,nm,x,y])=>{
+  const c=document.createElement('canvas');c.width=360;c.height=140;const g=c.getContext('2d');
+  const pa=R[n-1].p;let ar=0;for(let k=0;k<pa.length;k++){const q=pa[k],r2=pa[(k+1)%pa.length];ar+=q[0]*r2[1]-r2[0]*q[1];}ar=(Math.abs(ar)/2/(S*S)).toFixed(1).replace('.',',')+' m²';
+  g.font='bold 40px system-ui,sans-serif';const w1=g.measureText(nm).width;g.font='34px system-ui,sans-serif';const tw=Math.max(w1,g.measureText(ar).width),x0=180-tw/2-30,x1=180+tw/2+30;
+  g.fillStyle='#26292d';g.beginPath();g.moveTo(x0+30,8);g.lineTo(x1-30,8);g.arcTo(x1,8,x1,38,30);g.lineTo(x1,102);g.arcTo(x1,132,x1-30,132,30);g.lineTo(x0+30,132);g.arcTo(x0,132,x0,102,30);g.lineTo(x0,38);g.arcTo(x0,8,x0+30,8,30);g.closePath();g.fill();
+  g.fillStyle='#ffffff';g.font='bold 40px system-ui,sans-serif';g.textAlign='center';g.textBaseline='middle';g.fillText(nm,180,48);g.font='34px system-ui,sans-serif';g.fillText(ar,180,96);
+  const s=new THREE.Sprite(new THREE.SpriteMaterial({map:new THREE.CanvasTexture(c),depthTest:false}));
+  const p=P(x,y);s.position.set(p[0],1.3,p[1]);s.scale.set(1.2,0.467,1);s.renderOrder=10;scene.add(s);
+});
+{const a=P(1205,255),b=P(1205,395),len=b[1]-a[1],d=0.25,h=1.0;
+ const g=new THREE.BoxGeometry(d,h,len);
+ const m=new THREE.Mesh(g,[deck(len,1),deck(len,1),deck(len,d,true),deck(1,1),deck(d,1),deck(d,1)]);
+ m.position.set(a[0],h/2,(a[1]+b[1])/2);m.add(new THREE.LineSegments(new THREE.EdgesGeometry(g),edgeMat));scene.add(m);}
+const dW=new THREE.MeshStandardMaterial({color:0xffffff,roughness:.5}),dBr=new THREE.MeshStandardMaterial({color:0x6b4426,roughness:.5}),dBk=new THREE.MeshStandardMaterial({color:0x111111,roughness:.4});
+[].forEach((o,i)=>{
+ const A=P(o[0],o[1]),B=P(o[2],o[3]),hz=o[1]===o[3],len=hz?Math.abs(B[0]-A[0]):Math.abs(B[1]-A[1]);
+ const cx=(A[0]+B[0])/2,cz=(A[1]+B[1])/2,dt=i===3?0.07:0.05;
+ const dg=new THREE.BoxGeometry(hz?len-0.02:dt,2.05,hz?dt:len-0.02);
+ const dm=new THREE.Mesh(dg,i===3?[dW,dW,dW,dW,dBr,dW]:dW);dm.position.set(cx,1.025,cz);scene.add(dm);
+ const sg=(i>3?1:-1)*(len/2-0.1);
+ [-1,1].forEach(s=>{const hm=new THREE.Mesh(new THREE.BoxGeometry(hz?0.14:0.04,0.03,hz?0.04:0.14),dBk);
+  hm.position.set(cx+(hz?sg:s*(dt/2+0.02)),1.0,cz+(hz?s*(dt/2+0.02):sg));scene.add(hm);});
+});
+const DS=[[1,0,1],[1,-1,0],[1,-1,0],[1,0,-1],[0,1,0],[0,0,-1],[1,0,1]];
+O.forEach((o,i)=>{
+ const A=P(o[0],o[1]),B=P(o[2],o[3]),len=Math.hypot(B[0]-A[0],B[1]-A[1]),dt=i===3?0.07:0.05;
+ const hb=DS[i][0]===1,H=hb?B:A,F=hb?A:B;
+ const dx=(F[0]-H[0])/len,dz=(F[1]-H[1])/len,c=Math.SQRT1_2;
+ const ex=dx*c+DS[i][1]*c,ez=dz*c+DS[i][2]*c;
+ const gr=new THREE.Group();gr.position.set(H[0],0,H[1]);gr.rotation.y=Math.atan2(-ez,ex);
+ const leaf=new THREE.Mesh(new THREE.BoxGeometry(len-0.02,2.05,dt),[0,1,5].includes(i)?dRed:(i===6?dGreen:(i===3?[dW,dW,dW,dW,dW,dBr]:dW)));
+ leaf.position.set(len/2,1.025,0);gr.add(leaf);
+ [-1,1].forEach(s=>{const hm=new THREE.Mesh(new THREE.BoxGeometry(0.14,0.03,0.04),dBk);hm.position.set(len-0.12,1.0,s*(dt/2+0.02));gr.add(hm);});
+ scene.add(gr);
+});
+function clad(x1,y1,x2,y2,nx,nz,h,y0){
+ const A=P(x1,y1),B=P(x2,y2),hz=y1===y2,L=hz?Math.abs(B[0]-A[0]):Math.abs(B[1]-A[1]),th=0.012,off=T/2+th/2+0.001;
+ const m=new THREE.Mesh(new THREE.BoxGeometry(hz?L:th,h,hz?th:L),deck(L,h));
+ m.position.set((A[0]+B[0])/2+nx*off,y0+h/2,(A[1]+B[1])/2+nz*off);scene.add(m);
+}
+
+
+const mk=(w,h,d,x,y,z,m)=>{const o=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),m);o.position.set(x,y,z);scene.add(o);return o;};
+const sm=c=>new THREE.MeshStandardMaterial({color:c,roughness:.6});
+const fW=sm(0xf4f4f1),fG=sm(0x8995a1),chr=sm(0xb8bcc0),sam=sm(0xa4a9ae);
+const glass=new THREE.MeshStandardMaterial({color:0xbfdcf0,transparent:true,opacity:.3,roughness:.1,depthWrite:false});
+const slatM=new THREE.MeshStandardMaterial({map:tex(64,64,(g,w,h)=>{g.fillStyle='#ecebe7';g.fillRect(0,0,w,h);g.fillStyle='#a9a8a3';for(let i=0;i<8;i++)g.fillRect(0,i*8+6,w,2);},1),roughness:.7});
+// spavaća soba: prozor na zapadnom zidu s roletom
+box([460,650,460,952],false,0.9,0,wallMat);box([460,650,460,952],false,0.45,2.15,wallMat);
+const zc=6.29,WL=2.52,zm=5.9;
+mk(0.1,0.06,WL,0,0.93,zc,dW);mk(0.1,0.06,WL,0,2.12,zc,dW);mk(0.1,1.25,0.06,0,1.525,5.06,dW);mk(0.1,1.25,0.06,0,1.525,7.52,dW);mk(0.1,0.05,WL,0,1.68,zc,dW);mk(0.1,0.78,0.06,0,1.29,5.88,dW);mk(0.1,0.78,0.06,0,1.29,6.7,dW);
+mk(0.03,0.42,WL-0.12,-0.02,1.9,zc,slatM);
+mk(0.01,0.75,WL-0.12,0,1.29,zc,glass);mk(0.01,0.4,WL-0.12,0.03,1.9,zc,glass);
+[5.88,6.7].forEach(z=>{mk(0.03,0.12,0.02,0.075,1.25,z-0.05,dBk);mk(0.03,0.12,0.02,0.075,1.25,z+0.05,dBk);});
+mk(0.22,0.03,2.55,0.17,0.915,zc,dW);
+// radijator ispod prozora
+for(let i=0;i<14;i++)mk(0.09,0.62,0.04,0.11,0.5,6.2+i*0.055,fW);
+mk(0.07,0.03,0.8,0.1,0.83,6.575,fW);mk(0.07,0.03,0.8,0.1,0.18,6.575,fW);
+// papirnata luster lampa
+
+// ===== kuhinja =====
+const gran=new THREE.MeshStandardMaterial({map:tex(128,128,(g,w,h)=>{g.fillStyle='#b9b6ac';g.fillRect(0,0,w,h);for(let i=0;i<1200;i++){g.fillStyle=Math.random()<.5?'#dedbd1':'#8c8980';g.fillRect(rnd(0,w),rnd(0,h),1.5,1.5);}},4),roughness:.5});
+const cream=sm(0xe9dfb0),edgeB=sm(0xb07a3a),dkg=sm(0x2c2f33),steel=new THREE.MeshStandardMaterial({color:0xb9c0c6,metalness:.4,roughness:.35});
+const tt=tex(240,240,(g,w,h)=>tiles(g,w,h,6,[28,42,72],'#efe6d8'),1);tt.repeat.set(4.67,0.92);const tileM=fmat(tt);
+// prozor na sjevernom zidu
+const _kw=scene.children.length;
+box([1240,46,1427,46],false,0.93,0,wallMat);box([1240,46,1427,46],false,0.4,2.2,wallMat);
+{const x1=6.5,x2=8.0567,xc=7.2783,KL=1.5567;mk(0.05,0.465,0.1,xc,1.9075,0,dW);mk(0.02,0.07,0.03,xc-0.08,1.74,0.07,dBk);mk(0.02,0.07,0.03,xc+0.08,1.74,0.07,dBk);
+mk(KL,0.06,0.1,xc,0.96,0,dW);mk(KL,0.06,0.1,xc,2.17,0,dW);mk(0.06,1.27,0.1,x1+0.03,1.565,0,dW);mk(0.06,1.27,0.1,x2-0.03,1.565,0,dW);mk(KL,0.05,0.1,xc,1.65,0,dW);
+mk(KL-0.12,0.635,0.01,xc,1.31,0,glass);mk(KL-0.12,0.465,0.01,xc,1.9,0,glass);}
+// granitna klupčica i radijator ispod prozora
+mk(1.0,0.04,0.5,7.0,0.88,0.31,gran);
+for(let i=0;i<12;i++)mk(0.04,0.55,0.09,6.7+i*0.055,0.5,0.11,sm(0xd9d0bb));
+// štednjak
+const _k0=scene.children.length;
+// keramičke pločice iznad radne ploče i gornji elementi
+mk(0.01,0.55,2.8,7.975,1.175,1.455,tileM);
+scene.children.slice(_k0).forEach(o=>{o.position.x+=0.077;});
+scene.children.slice(_kw).forEach(o=>{o.position.x-=0.1667;});
+// šank: granitna ploča, drveni nadvoj, stup, sat i zdjela
+mk(0.32,0.03,1.17,6.208,1.015,2.325,gran);
+mk(0.25,0.6,2.35,6.208,2.3,1.735,deck(2.35,0.6));
+mk(0.12,2.0,0.12,6.208,1.0,1.74,sm(0xb98a56));
+const cyl=(r,l,c,x,y,z)=>{const o=new THREE.Mesh(new THREE.CylinderGeometry(r,r,l,32),sm(c));o.rotation.z=Math.PI/2;o.position.set(x,y,z);scene.add(o);};
+// ===== kupaona =====
+function lin(x1,y1,x2,y2,nx,nz,h,y0,t){const A=P(x1,y1),B=P(x2,y2),hz=y1===y2,L=hz?Math.abs(B[0]-A[0]):Math.abs(B[1]-A[1]),th=0.012,off=T/2+th/2+0.001;
+ const m=new THREE.Mesh(new THREE.BoxGeometry(hz?L:th,h,hz?th:L),t(L,h));m.position.set((A[0]+B[0])/2+nx*off,y0+h/2,(A[1]+B[1])/2+nz*off);scene.add(m);}
+const tileB=(L,h)=>{const t=tex(128,128,(g,w,hh)=>tiles(g,w,hh,2,[222,45,20],'#8e949c'),1);t.repeat.set(L/0.6,h/0.6);return fmat(t);};
+const bord=(L,h)=>{const t=tex(128,32,(g,w,hh)=>{g.fillStyle='#2f3c58';g.fillRect(0,0,w,hh);g.fillStyle='#c9ccd0';for(let i=0;i<4;i++)g.fillRect(i*32+8,8,16,16);},1);t.repeat.set(L/0.4,1);return fmat(t);};
+[[1197,494,1407,494,0,1],[1414,501,1414,811,-1,0],[1197,818,1407,818,0,-1],[1190,501,1190,670,1,0],[1190,769,1190,811,1,0]].forEach(w=>{lin(...w,1.2,0,tileB);lin(...w,0.1,1.2,bord);});
+const cylz=(r,l,c,x,y,z)=>{const o=new THREE.Mesh(new THREE.CylinderGeometry(r,r,l,32),sm(c));o.rotation.x=Math.PI/2;o.position.set(x,y,z);scene.add(o);};
+const _bz=scene.children.length;
+// ručnikgrijalo (ljestvica) uz sjeverni zid
+for(let i=0;i<24;i++)mk(0.5,0.022,0.05,7.0,0.35+i*0.06,4.215,fW);
+mk(0.03,1.45,0.05,6.76,1.05,4.215,fW);mk(0.03,1.45,0.05,7.24,1.05,4.215,fW);
+// WC školjka uz istočni zid
+const _b0=scene.children.length;
+mk(0.5,0.4,0.36,7.65,0.2,4.41,fW);mk(0.44,0.03,0.34,7.6,0.42,4.41,fW);mk(0.16,0.4,0.4,7.82,0.75,4.41,fW);
+// umivaonik s ormarićem, ogledalo i svjetiljka
+mk(0.5,0.05,0.6,7.65,0.825,4.95,fW);mk(0.03,0.15,0.03,7.85,0.93,4.95,chr);mk(0.1,0.025,0.025,7.8,1.0,4.95,chr);
+mk(0.08,0.06,0.5,7.86,2.08,4.95,new THREE.MeshStandardMaterial({color:0xfff6d8,emissive:0xcfc08a}));
+// kutna tuš kabina
+{const cx=7.9,cz=6.7833;
+ const tray=new THREE.Mesh(new THREE.CylinderGeometry(0.8,0.8,0.15,24,1,false,Math.PI,Math.PI/2),fmat(null));
+ tray.material=new THREE.MeshStandardMaterial({color:0xf2f1ec,roughness:.5,side:THREE.DoubleSide});tray.position.set(cx,0.075,cz);scene.add(tray);
+ const gl=new THREE.Mesh(new THREE.CylinderGeometry(0.8,0.8,1.9,24,1,true,Math.PI,Math.PI/2),new THREE.MeshStandardMaterial({color:0xe9eef0,transparent:true,opacity:.45,side:THREE.DoubleSide,depthWrite:false}));
+ gl.position.set(cx,1.1,cz);scene.add(gl);
+ const rg=new THREE.Group(),tor=new THREE.Mesh(new THREE.TorusGeometry(0.8,0.015,8,24,Math.PI/2),fW);tor.rotation.x=Math.PI/2;rg.add(tor);rg.rotation.y=Math.PI;rg.position.set(cx,2.05,cz);scene.add(rg);
+ mk(0.04,1.9,0.04,cx,1.1,cz-0.8,fW);mk(0.04,1.9,0.04,cx-0.8,1.1,cz,fW);
+ mk(0.08,1.5,0.22,7.86,1.1,6.3833,fW);mk(0.015,1.0,0.015,7.8,1.2,6.3833,chr);}
+scene.children.slice(_b0).forEach(o=>{o.position.x-=0.01;});
+scene.children.slice(_bz).forEach(o=>{o.position.z-=0.3917;});
+// ===== dnevna soba =====
+const wood=sm(0xdcb98a),bluU=sm(0x4a72b8),sofaM=sm(0x1f4f95),cushY=sm(0xe8c25a),cushB=sm(0x2c58a6),navy=sm(0x1d2c52),pouf=sm(0x2d58aa);
+const frost=new THREE.MeshStandardMaterial({color:0xcfd6dc,transparent:true,opacity:.6,roughness:.3}),grayF=sm(0xa9aeb3);
+const cylY=(r1,r2,h,c,x,y,z)=>{const o=new THREE.Mesh(new THREE.CylinderGeometry(r1,r2,h,32),c);o.position.set(x,y,z);scene.add(o);};
+// prozor na zapadnom zidu s plavom zavjesom
+box([460,88,460,400],false,0.9,0,wallMat);box([460,88,460,400],false,0.45,2.15,wallMat);
+{const zc=1.65,WL=2.6;
+mk(0.1,0.06,WL,0,0.93,zc,dW);mk(0.1,0.06,WL,0,2.12,zc,dW);mk(0.1,1.25,0.06,0,1.525,0.38,dW);mk(0.1,1.25,0.06,0,1.525,2.92,dW);
+mk(0.1,1.2,0.05,0,1.525,1.25,dW);mk(0.1,1.2,0.05,0,1.525,2.05,dW);
+mk(0.01,1.15,WL-0.12,0,1.525,zc,new THREE.MeshStandardMaterial({color:0xf2f5f8,transparent:true,opacity:.18,roughness:.1,depthWrite:false}));mk(0.22,0.03,2.65,0.17,0.915,zc,dW);
+{const ct=tex(64,64,(g,w,h)=>{g.clearRect(0,0,w,h);g.fillStyle='rgba(31,92,200,0.85)';for(let i=0;i<4;i++){g.fillRect(i*16,0,5,h);g.fillRect(0,i*16,w,5);}},1);ct.repeat.set(23,14);mk(0.02,1.7,2.8,0.075,1.5,zc,new THREE.MeshStandardMaterial({map:ct,transparent:true,side:THREE.DoubleSide,depthWrite:false}));}}
+// balkonska vrata i balkon
+box([1024,113,1180,113],false,0.5,2.1,wallMat);
+[5.025].forEach(xc=>{mk(0.62,1.0,0.05,xc,0.5,0.558,dW);mk(0.65,0.05,0.06,xc,1.075,0.558,dW);mk(0.65,0.05,0.06,xc,2.075,0.558,dW);mk(0.04,1.05,0.06,xc-0.305,1.575,0.558,dW);mk(0.04,1.05,0.06,xc+0.305,1.575,0.558,dW);mk(0.56,0.95,0.01,xc,1.575,0.558,glass);});
+{const dg=new THREE.Group(),ad=(w,h,d,x,y,z,m)=>{const o=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),m);o.position.set(x,y,z);dg.add(o);};
+dg.position.set(6.0,0,0.558);dg.rotation.y=Math.atan2(0.707,-0.707);
+ad(0.62,1.0,0.05,0.325,0.5,0,dW);ad(0.65,0.05,0.06,0.325,1.075,0,dW);ad(0.65,0.05,0.06,0.325,2.075,0,dW);ad(0.04,1.05,0.06,0.02,1.575,0,dW);ad(0.04,1.05,0.06,0.63,1.575,0,dW);ad(0.56,0.95,0.01,0.325,1.575,0,glass);
+[-0.045,0.045].forEach(z=>ad(0.12,0.02,0.03,0.58,1.0,z,dBk));scene.add(dg);}
+const bt=tex(256,256,(g,w,h)=>tiles(g,w,h,1,[215,16,34],'#7a828c'),1);bt.repeat.set(5.1,2.4);
+mk(2.55,0.05,1.2,5.0,-0.025,-0.042,fmat(bt));
+const par=sm(0xf3f1ea);mk(2.55,1.0,0.1,5.0,0.5,-0.592,par);mk(0.1,1.0,0.76,3.775,0.5,-0.265,par);mk(0.1,1.0,0.64,6.225,0.5,-0.32,par);mk(2.55,0.04,0.04,5.0,1.04,-0.592,dkg);
+// zidni elementi s TV-om uz zid prema spavaćoj sobi (južni zid)
+const _n0=scene.children.length;
+scene.children.slice(_n0).forEach(o=>{o.position.x-=0.43;});
+// radijator ispod prozora dnevne sobe
+for(let i=0;i<14;i++)mk(0.06,0.55,0.04,0.09,0.45,1.25+i*0.055,sm(0xe6e0d0));mk(0.05,0.03,0.8,0.09,0.76,1.625,sm(0xe6e0d0));mk(0.05,0.03,0.8,0.09,0.16,1.625,sm(0xe6e0d0));
+// ===== predsoblje =====
+const hb=sm(0x23428a),mirM=new THREE.MeshStandardMaterial({color:0xd6e6ef,metalness:.2,roughness:.05,emissive:0x1c2a33});
+// ormar za cipele uz ulazna vrata, ogledalo s kukicama i razvodna kutija
+mk(0.4,0.45,0.2,5.4,2.25,7.47,fW);
+// ugrađeni ormarić u zidu ostave prema dnevnoj sobi
+mk(0.05,2.6,1.075,6.308,1.3,3.3205,wallMat);mk(0.2,2.6,0.187,6.183,1.3,2.8765,wallMat);mk(0.2,2.6,0.188,6.183,1.3,3.764,wallMat);mk(0.2,0.1,0.7,6.183,0.05,3.32,wallMat);mk(0.2,0.5,0.7,6.183,2.35,3.32,wallMat);
+// ===== mjere po zidovima (iz tlocrta) =====
+const dimG=new THREE.Group();
+[['3,727',686,37],['0,440',861,86],['2,714',1096,139],['0,550',1272,79],['1,675',1336,24],['2,835',1472,211],['4,828',414,344],['2,694',413,795],['3,976',700,665],['3,972',700,989],['0,250',1207,223],['1,180',1144,319],['0,822',1144,440],['0,822',1455,440],['1,640',1320,472],['1,190',1011,472],['0,916',1137,521],['0,348',1227,515],['0,612',1143,572],['1,205',891,511],['0,860',975,564],['1,846',1301,565],['2,115',1447,662],['0,822',1143,658],['0,745',1143,747],['1,489',975,723],['0,937',975,873],['1,432',1143,878],['0,268',891,946],['1,093',1004,940],['0,060',1018,975],['1,005',1130,996],['2,098',1065,1049],['1,837',1301,822],['2,177',1479,833],['3,959',1527,726],['0,775',1279,422],['0,775',1372,373],['0,090',1257,368]].forEach(d=>{
+  const c=document.createElement('canvas');c.width=160;c.height=60;const g=c.getContext('2d');
+  g.fillStyle='rgba(255,255,255,0.92)';g.fillRect(4,4,152,52);g.strokeStyle='#2255cc';g.lineWidth=3;g.strokeRect(4,4,152,52);
+  g.fillStyle='#1d4fc4';g.font='bold 34px system-ui,sans-serif';g.textAlign='center';g.textBaseline='middle';g.fillText(d[0],80,32);
+  const s=new THREE.Sprite(new THREE.SpriteMaterial({map:new THREE.CanvasTexture(c),depthTest:false}));
+  const p=P(d[1],d[2]);s.position.set(p[0],2.75,p[1]);s.scale.set(0.64,0.24,1);s.renderOrder=9;dimG.add(s);});
+dimG.visible=false;scene.add(dimG);
+const target=new THREE.Vector3(4.0,0.6,3.85);
+let th=0.75,ph=0.9,rad=15;
+function draw(){
+  cam.position.set(target.x+rad*Math.sin(ph)*Math.sin(th),target.y+rad*Math.cos(ph),target.z+rad*Math.sin(ph)*Math.cos(th));
+  cam.lookAt(target);ren.render(scene,cam);
+}
+function size(){const w=innerWidth,h=innerHeight;ren.setSize(w,h,false);cam.aspect=w/h;cam.updateProjectionMatrix();draw();}
+addEventListener('resize',size);size();
+let drag=false,lx=0,ly=0;
+cv.addEventListener('pointerdown',e=>{drag=true;lx=e.clientX;ly=e.clientY;cv.setPointerCapture(e.pointerId);cv.style.cursor='grabbing';});
+cv.addEventListener('pointerup',()=>{drag=false;cv.style.cursor='grab';});
+cv.addEventListener('pointermove',e=>{if(!drag)return;th-=(e.clientX-lx)*0.008;ph=Math.min(1.5,Math.max(0.05,ph-(e.clientY-ly)*0.008));lx=e.clientX;ly=e.clientY;draw();});
+cv.addEventListener('wheel',e=>{e.preventDefault();rad=Math.min(40,Math.max(5,rad*(1+e.deltaY*0.001)));draw();},{passive:false});
+const z=f=>{rad=Math.min(40,Math.max(5,rad*f));draw();};
+document.getElementById('zi').onclick=()=>z(0.85);
+document.getElementById('zo').onclick=()=>z(1.18);
+document.getElementById('iso').onclick=()=>{th=0.75;ph=0.9;rad=15;draw();};
+document.getElementById('top').onclick=()=>{th=0;ph=0.05;rad=17;draw();};
+document.getElementById('dim').onclick=function(){dimG.visible=!dimG.visible;this.classList.toggle('on',dimG.visible);draw();};
+</script>
+
+
+</body></html>
