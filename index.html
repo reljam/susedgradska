@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Stan – 3D pregled</title>
+<title>Stan Marković, Susedgradska 5 – preuređenje</title>
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body {
@@ -16,6 +16,18 @@
   header { max-width: 900px; margin: 0 auto 24px; }
   h1 { font-size: 1.5rem; font-weight: 700; }
   header p { color: #6b7280; font-size: 0.95rem; margin-top: 4px; }
+  .help {
+    background: #f9fafb;
+    border: 1px solid #e5e7eb;
+    border-radius: 12px;
+    padding: 12px 16px;
+    margin-top: 14px;
+    font-size: 0.9rem;
+    color: #4b5563;
+  }
+  .help ul { padding-left: 18px; margin-top: 4px; }
+  .help li { margin: 3px 0; }
+  .feature { margin-bottom: 16px; }
   .grid {
     max-width: 900px;
     margin: 0 auto;
@@ -25,6 +37,7 @@
   }
   @media (min-width: 640px) {
     .grid { grid-template-columns: 1fr 1fr; gap: 20px; }
+    .feature { margin-bottom: 20px; grid-template-columns: calc(50% - 10px); justify-content: center; }
   }
   .card {
     display: block;
@@ -63,9 +76,25 @@
 </head>
 <body>
   <header>
-    <h1>3D pregled stana</h1>
-    <p>Odaberi prikaz</p>
+    <h1>Stan Marković, Susedgradska 5</h1>
+    <p>Preuređenje stana – mjerenje i 3D prikazi stanja i promjena zidova</p>
+    <div class="help">
+      <strong>Kako koristiti</strong>
+      <ul>
+        <li>Dodirni karticu za otvaranje prikaza.</li>
+        <li>U 3D prikazu povuci prstom za okretanje, a za zumiranje koristi dva prsta ili tipke +/−.</li>
+        <li>Gumb <b>Mjere</b> uključuje i isključuje dimenzije, a <b>Odozgo</b> prikazuje tlocrt.</li>
+        <li>Za povratak na ovu stranicu koristi tipku Natrag.</li>
+      </ul>
+    </div>
   </header>
+
+  <section class="grid feature">
+    <a class="card" href="mjere_ian.jpg">
+      <img class="thumb" src="mjere_ian.jpg" alt="Inicijalno mjerenje" loading="lazy">
+      <div class="label">Inicijalno mjerenje <span class="arrow">›</span></div>
+    </a>
+  </section>
 
   <main class="grid">
     <a class="card" href="stanje_pocetno.html">
