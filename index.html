@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="hr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Stan – 3D pregled</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: #fff;
+    color: #1f2937;
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    line-height: 1.4;
+    padding: 24px 16px 40px;
+  }
+  header { max-width: 900px; margin: 0 auto 24px; }
+  h1 { font-size: 1.5rem; font-weight: 700; }
+  header p { color: #6b7280; font-size: 0.95rem; margin-top: 4px; }
+  .grid {
+    max-width: 900px;
+    margin: 0 auto;
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 16px;
+  }
+  @media (min-width: 640px) {
+    .grid { grid-template-columns: 1fr 1fr; gap: 20px; }
+  }
+  .card {
+    display: block;
+    text-decoration: none;
+    color: inherit;
+    border: 1px solid #e5e7eb;
+    border-radius: 14px;
+    overflow: hidden;
+    background: #fff;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+    transition: transform .15s ease, box-shadow .15s ease;
+  }
+  .card:hover, .card:focus-visible {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 16px rgba(0,0,0,0.10);
+    outline: none;
+  }
+  .card:active { transform: scale(0.99); }
+  .thumb {
+    width: 100%;
+    aspect-ratio: 16 / 10;
+    object-fit: cover;
+    display: block;
+    background: #f3f4f6;
+  }
+  .label {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 14px 16px;
+    font-size: 1.05rem;
+    font-weight: 600;
+  }
+  .label span.arrow { color: #9ca3af; font-size: 1.2rem; }
+</style>
+</head>
+<body>
+  <header>
+    <h1>3D pregled stana</h1>
+    <p>Odaberi prikaz</p>
+  </header>
+
+  <main class="grid">
+    <a class="card" href="stanje_pocetno.html">
+      <img class="thumb" src="stanje_pocetno.png" alt="Početno stanje" loading="lazy">
+      <div class="label">Početno stanje <span class="arrow">›</span></div>
+    </a>
+    <a class="card" href="zidovi_rusenje.html">
+      <img class="thumb" src="zidovi_rusenje.png" alt="Pregled zidova za rušenje" loading="lazy">
+      <div class="label">Pregled zidova za rušenje <span class="arrow">›</span></div>
+    </a>
+    <a class="card" href="zidovi_svi.html">
+      <img class="thumb" src="zidovi_svi.png" alt="Pregled svih promjena zidova" loading="lazy">
+      <div class="label">Pregled svih promjena zidova <span class="arrow">›</span></div>
+    </a>
+    <a class="card" href="zidovi_novi.html">
+      <img class="thumb" src="zidovi_novi.png" alt="Pregled samo novih zidova" loading="lazy">
+      <div class="label">Pregled samo novih zidova <span class="arrow">›</span></div>
+    </a>
+  </main>
+</body>
+</html>
