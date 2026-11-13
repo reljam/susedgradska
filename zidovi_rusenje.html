@@ -261,7 +261,7 @@ const dimG=new THREE.Group();
   const p=P(d[1],d[2]);s.position.set(p[0],2.75,p[1]);s.scale.set(0.64,0.24,1);s.renderOrder=9;dimG.add(s);});
 dimG.visible=false;scene.add(dimG);
 const target=new THREE.Vector3(4.0,0.6,3.85);
-let th=0.75,ph=0.9,rad=15;
+let th=0.75+Math.PI,ph=0.9,rad=15;
 function draw(){
   cam.position.set(target.x+rad*Math.sin(ph)*Math.sin(th),target.y+rad*Math.cos(ph),target.z+rad*Math.sin(ph)*Math.cos(th));
   cam.lookAt(target);ren.render(scene,cam);
@@ -276,7 +276,7 @@ cv.addEventListener('wheel',e=>{e.preventDefault();rad=Math.min(40,Math.max(5,ra
 const z=f=>{rad=Math.min(40,Math.max(5,rad*f));draw();};
 document.getElementById('zi').onclick=()=>z(0.85);
 document.getElementById('zo').onclick=()=>z(1.18);
-document.getElementById('iso').onclick=()=>{th=0.75;ph=0.9;rad=15;draw();};
+document.getElementById('iso').onclick=()=>{th=0.75+Math.PI;ph=0.9;rad=15;draw();};
 document.getElementById('top').onclick=()=>{th=0;ph=0.05;rad=17;draw();};
 document.getElementById('dim').onclick=function(){dimG.visible=!dimG.visible;this.classList.toggle('on',dimG.visible);draw();};
 </script>
